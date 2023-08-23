@@ -1,10 +1,26 @@
 Config = Config or {}
 
-
 Config.Prize = {
     min = 1000,
     max = 12000,
-    item = 'black_money' -- if this one is not present, it will give cash instead
+    item = 'black_money', -- if this one is not present, it will give cash instead
+    safe = {
+        ['black_money'] = {
+            min = 5000,
+            max = 10000,
+            chance = 100
+        },
+        ['goldbar'] = {
+            min = 1,
+            max = 5,
+            chance = 20
+        },
+        ['moneybag'] = {
+            min = 1,
+            max = 2,
+            chance = 10
+        }
+    }
 }
 
 Config.Store = {
@@ -28,7 +44,7 @@ Config.Store = {
                 coords = vector4(24.41, -1347.36, 29.5, 275.64)
             }
         },
-        -- player must search for combination... Ain't no way I'm gonna make my player base take rob so easy
+        -- player must search for combination... Ain't no way I'm gonna make my player do robbery so easy
         search = {
             [1] = {
                 coords = vec3(30.75, -1338.65, 29.0),
@@ -47,7 +63,9 @@ Config.Store = {
                 iscomputer = true
             }
         },
-        safe = vector4(28.04, -1339.16, 29.5, 2.16)
+        safe = {
+            coords = vector4(28.26, -1339.13, 29.5, 5.83)
+        }
     },
 
 }

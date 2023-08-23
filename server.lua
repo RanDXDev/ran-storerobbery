@@ -8,6 +8,47 @@ local function SendLog(title, content)
 
 end
 
+local function GenerateSafeItems()
+    local totalChance = 0
+    for item, properties in pairs(Config.Prize.safe) do
+        totalChance = totalChance + properties.chance
+    end
+
+    local randomNumber = math.random(1, totalChance)
+    local currentChance = 0
+
+    local selectedItems = {}
+
+    for item, properties in pairs(Config.Prize.safe) do
+        currentChance = currentChance + properties.chance
+        if randomNumber <= currentChance then
+            local itemCount = math.random(properties.min, properties.max)
+            selectedItems[#selectedItems + 1] = {
+                [1] = item,
+                [2] = itemCount
+            }
+        end
+    end
+
+    return selectedItems
+end
+
+RegisterCommand("testyl", function()
+    local item = GenerateSafeItems()
+    print(json.encode(item))
+end, false)
+
+local function IncludeInventoryID(id)
+    for k, v in ipairs(Config.Store) do
+        if v.safe then
+            if v.safe.id == id then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local function GenerateCombination()
     return QBCore.Shared.RandomInt(4)
 end
@@ -71,10 +112,48 @@ lib.callback.register("ran-storerobbery:server:combination", function(source, st
         xPlayer.Functions.AddItem('stickynote', 1, nil, {
             combination = combination
         })
-        cfg.combination = combination
+        cfg.combination = tonumber(combination)
     end
     scfg.searched = true
     print(lib.table.matches(cfg, Config.Store[storeid]))
     TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, cfg)
     return true
+end)
+
+lib.callback.register("ran-storerobbery:server:setSafeState", function(source, storeid)
+    local config = Config.Store[storeid]
+    if not config then return end
+    if config.safe.opened and config.safe.id then return end
+    config.safe.isopened = true
+    config.safe.id = exports.ox_inventory:CreateTemporaryStash({
+        label = "Safe",
+        slots = 10,
+        maxWeight = 30000,
+        items = GenerateSafeItems()
+    })
+    TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, config)
+    return true
+end)
+
+local hookid
+CreateThread(function()
+    hookid = exports.ox_inventory:registerHook("swapItems", function(payload)
+        if payload.fromType == "player" and IncludeInventoryID(payload.toInventory) then
+            return false
+        else
+            return true
+        end
+    end, {
+        inventoryFilter = {
+            '^temp-[%w]+',
+        }
+    })
+end)
+
+AddEventHandler('onResourceStop', function(resource)
+    if resource == GetCurrentResourceName() then
+        if hookid then
+            exports.ox_inventory:removeHooks(hookid)
+        end
+    end
 end)

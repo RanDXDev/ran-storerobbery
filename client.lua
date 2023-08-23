@@ -4,6 +4,7 @@ local PlayerData = {}
 local CurrentStore
 local InRegZone, RegZoneID = false, nil
 local TempStoreData = {}
+local ox_inventory = exports.ox_inventory
 
 local function Enter(self)
     InRegZone = true
@@ -12,6 +13,21 @@ end
 
 local function Alert()
 
+end
+
+local function DrawText3D(x, y, z, text)
+    SetTextScale(0.35, 0.35)
+    SetTextFont(4)
+    SetTextProportional(1)
+    SetTextColour(255, 255, 255, 215)
+    SetTextEntry("STRING")
+    SetTextCentre(true)
+    AddTextComponentString(text)
+    SetDrawOrigin(x, y, z, 0)
+    DrawText(0.0, 0.0)
+    local factor = (string.len(text)) / 370
+    DrawRect(0.0, 0.0 + 0.0125, 0.017 + factor, 0.03, 0, 0, 0, 75)
+    ClearDrawOrigin()
 end
 
 local function EntityDamage(victim)
@@ -65,7 +81,7 @@ local function RobRegistar()
         lib.callback("ran-houserobbery:server:getPrize", false, function(cb)
             QBCore.Functions.Notify(
                 ("You got %s %s"):format(success,
-                    Config.Prize.item and exports.ox_inventory:Items(Config.Prize.item).label or "Cash"), "success")
+                    Config.Prize.item and ox_inventory:Items(Config.Prize.item).label or "Cash"), "success")
         end, success, CurrentStore, RegZoneID)
     end
     TaskPlayAnim(ped, anim, "exit", 8.0, 8.0, -1, 0, 1.0, false, false, false)
@@ -135,6 +151,7 @@ local function SetupStore(id)
     until IsInteriorReady(interior)
     local function UpdateConfig()
         if not lib.table.matches(cfg, Config.Store[id]) then
+            print("UPDATE CONFIG")
             cfg = Config.Store[id]
         end
     end
@@ -153,6 +170,41 @@ local function SetupStore(id)
         local success = exports['ran-minigames']:MemoryCard()
         if success then
             TriggerServerEvent("ran-houserobbery:server:setHackedState", self.storeid)
+        end
+    end
+    local function OpenPinPrompt()
+        local input = lib.inputDialog("Pin", {
+            {
+                type = 'number',
+                label = "Pin Number",
+            }
+        })
+        if not input then return end
+        if not input[1] then
+            return QBCore.Functions.Notify("You need to fill the pin...", "error")
+        end
+        local num = tonumber(input[1])
+        if num == cfg.combination then
+            lib.callback.await("ran-storerobbery:server:setSafeState", false, CurrentStore, true)
+            return QBCore.Functions.Notify("You unlocked the safe", "success")
+        else
+            return QBCore.Functions.Notify("Wrong pin number...", "error")
+        end
+    end
+    local function InsideSafe(self)
+        ---@type vector3
+        local coords = self.coords
+        if cfg.safe.isopened then
+            DrawText3D(coords.x, coords.y, coords.z, "[~g~E~w~] Open Safe")
+        else
+            DrawText3D(coords.x, coords.y, coords.z, "[~r~E~w~] Try pin")
+        end
+        if IsControlJustPressed(0, 46) then
+            if cfg.safe.isopened and cfg.safe.id then
+                ox_inventory:openInventory("stash", cfg.safe.id)
+            else
+                OpenPinPrompt()
+            end
         end
     end
     if cfg.hack then
@@ -213,6 +265,13 @@ local function SetupStore(id)
             })
         end
     end
+    if cfg.safe then
+        TempStoreData.safe = lib.zones.sphere({
+            coords = cfg.safe.coords.xyz,
+            radius = 1.0,
+            inside = InsideSafe
+        })
+    end
     CreateThread(function()
         while CurrentStore == id do
             UpdateConfig()
@@ -241,6 +300,9 @@ local function ResetStore(id)
             exports.ox_target:removeZone(v)
         end
     end
+    if TempStoreData.safe then
+        TempStoreData.safe:remove()
+    end
     if EData then
         RemoveEventHandler(EData)
         EData = nil
@@ -253,7 +315,7 @@ end
 AddStateBagChangeHandler('isLoggedIn', nil, function(_bagName, _key, value, _reserved, _replicated)
     if value then
         PlayerData = QBCore.Functions.GetPlayerData()
-        exports.ox_inventory:displayMetadata({
+        ox_inventory:displayMetadata({
             combination = "Combination"
         })
     else
@@ -282,6 +344,7 @@ RegisterNetEvent("ran-storerobbery:client:setStoreConfig", function(id, cfg)
     if not id or not cfg then return end
     if not type(cfg) == "table" then return end
     if not Config.Store[id] then return end
+    print("UPDATE STORE CONFIG")
     Config.Store[id] = cfg
 end)
 
