@@ -151,8 +151,7 @@ local function SearchCombination(storeid, sid)
         TaskPlayAnim(cache.ped, animdict, anim, 8.0, 8.0, -1, 1, 1.0, false, false, false)
         local success = exports['ran-minigames']:OpenTerminal()
         if success then
-            local canGet = true
-            -- local canGet = math.random(1, 100) > 50 and true or false
+            local canGet = math.random(1, 100) > 50 and true or false
             if canGet then
                 local TimeToWait = math.random(20, 30)
                 searchLoc.searched = true
