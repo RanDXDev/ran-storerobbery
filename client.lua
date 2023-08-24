@@ -45,7 +45,13 @@ local function DrawText3D(x, y, z, text)
     ClearDrawOrigin()
 end
 
-local function EntityDamage(victim)
+local propmodel = joaat('prop_till_01')
+
+---@param victim number
+---@param culprit number
+---@return nil
+local function EntityDamage(victim, culprit)
+    if culprit ~= cache.ped then return end
     if Config.MinPolice > CopCount then return end
     local alerted = false
     if not CurrentStore then return end
@@ -54,7 +60,7 @@ local function EntityDamage(victim)
     if cfg.alerted then return end
     if next(TempStoreData) == nil then return end
     local model = GetEntityModel(victim)
-    if model == joaat('prop_till_01') and not alerted then
+    if model == propmodel and not alerted then
         return Alert(CurrentStore)
     end
 end
@@ -354,7 +360,7 @@ local function SetupStore(id)
     CreateThread(function()
         while CurrentStore == id do
             UpdateConfig()
-            Wait(1000)
+            Wait(500)
         end
     end)
 end
