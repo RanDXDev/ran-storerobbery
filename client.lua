@@ -156,7 +156,7 @@ local function SearchCombination(storeid, sid)
             if canGet then
                 local TimeToWait = math.random(20, 30)
                 searchLoc.searched = true
-                QBCore.Functions.Notify("You need to wait " .. TimeToWait .. " seconds, to decrpyt the code")
+                QBCore.Functions.Notify("You need to wait " .. TimeToWait .. " seconds, to decrypt the code")
                 SetTimeout(1000 * TimeToWait, function()
                     lib.callback.await("ran-storerobbery:server:combination", false, storeid, sid, true)
                     QBCore.Functions.Notify("You got the combination key")
