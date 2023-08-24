@@ -5,14 +5,29 @@ local CurrentStore
 local InRegZone, RegZoneID = false, nil
 local TempStoreData = {}
 local ox_inventory = exports.ox_inventory
+local CopCount = 0
 
-local function Enter(self)
-    InRegZone = true
-    RegZoneID = self.regid
+local function SendDispatch()
+    if GetResourceState("ps-dispatch") == "started" then
+        exports['ps-dispatch']:StoreRobbery()
+    end
 end
 
-local function Alert()
-
+local function Alert(id)
+    local cfg = Config.Store[id]
+    if not cfg then return end
+    if cfg.alerted then return end
+    cfg.alerted = true
+    TriggerServerEvent("ran-storerobbery:server:registerAlert", id, true)
+    if cfg?.hack?.delayCount then
+        SetTimeout(1000 * cfg.hack.delayCount, function()
+            SendDispatch()
+            QBCore.Functions.Notify("The police has been notified", "error")
+        end)
+    else
+        QBCore.Functions.Notify("The police has been notified", "error")
+        SendDispatch()
+    end
 end
 
 local function DrawText3D(x, y, z, text)
@@ -31,21 +46,22 @@ local function DrawText3D(x, y, z, text)
 end
 
 local function EntityDamage(victim)
+    if Config.MinPolice > CopCount then return end
+    local alerted = false
     if not CurrentStore then return end
     if not TempStoreData then return end
     local cfg = Config.Store[CurrentStore]
     if cfg.alerted then return end
-    local damageCashier = false
     if next(TempStoreData) == nil then return end
-    for _, v in pairs(TempStoreData.registar) do
-        if v.entity == victim then
-            damageCashier = true
-            break
-        end
+    local model = GetEntityModel(victim)
+    if model == joaat('prop_till_01') and not alerted then
+        return Alert(CurrentStore)
     end
-    if damageCashier then
-        lib.callback("ran-storerobbery:server:registerAlert")
-    end
+end
+
+local function Enter(self)
+    InRegZone = true
+    RegZoneID = self.regid
 end
 
 local function Exit()
@@ -53,10 +69,28 @@ local function Exit()
     RegZoneID = nil
 end
 
+local function AllStashSearched(id)
+    if not id then return end
+    local cfg = Config.Store[id]
+    if not cfg then return end
+    local allsearched = true
+    for k, v in pairs(cfg.search) do
+        if not v.iscomputer and not v.searched then
+            allsearched = false
+            break
+        end
+    end
+    return allsearched
+end
+
 local function RobRegistar()
     if not CurrentStore then return end
     if not RegZoneID or not InRegZone then
         QBCore.Functions.Notify("You need to stand in front of cashier", "error")
+        return
+    end
+    if Config.MinPolice > CopCount then
+        QBCore.Functions.Notify("Not enough cops", "error")
         return
     end
     local ped = cache.ped
@@ -91,26 +125,46 @@ end
 local EData = nil
 
 local function SearchCombination(storeid, sid)
+    if Config.MinPolice > CopCount then
+        QBCore.Functions.Notify("Not enough police", "error")
+        return
+    end
     local config = Config.Store[storeid]
     if not config then return end
     local searchLoc = config.search[sid]
     if not searchLoc then return end
+    if config.cooldown then return end
     if config.combination then
         return QBCore.Functions.Notify("You already got the combination...")
     end
     if searchLoc.searched then
         return QBCore.Functions.Notify("You already search this place...")
     end
-
+    Alert(storeid)
     if searchLoc.iscomputer then
+        if not AllStashSearched(storeid) then
+            return QBCore.Functions.Notify("You need to search all the cabinet first...", "error")
+        end
         local animdict = 'anim@scripted@player@mission@tunf_bunk_ig3_nas_upload@'
         local anim     = 'normal_typing'
         lib.requestAnimDict(animdict)
         TaskPlayAnim(cache.ped, animdict, anim, 8.0, 8.0, -1, 1, 1.0, false, false, false)
-        local minigame = exports['ran-minigames']:OpenTerminal()
-        if minigame then
-            lib.callback.await("ran-storerobbery:server:combination", false, storeid, sid, true)
-            QBCore.Functions.Notify("You got the combination key")
+        local success = exports['ran-minigames']:OpenTerminal()
+        if success then
+            local canGet = true
+            -- local canGet = math.random(1, 100) > 50 and true or false
+            if canGet then
+                local TimeToWait = math.random(20, 30)
+                searchLoc.searched = true
+                QBCore.Functions.Notify("You need to wait " .. TimeToWait .. " seconds, to decrpyt the code")
+                SetTimeout(1000 * TimeToWait, function()
+                    lib.callback.await("ran-storerobbery:server:combination", false, storeid, sid, true)
+                    QBCore.Functions.Notify("You got the combination key")
+                end)
+            else
+                lib.callback.await("ran-storerobbery:server:combination", false, storeid, sid, false)
+                QBCore.Functions.Notify("Unable to get any information about pin from this computer", "error")
+            end
         end
         ClearPedTasks(cache.ped)
     else
@@ -140,9 +194,9 @@ local function SearchCombination(storeid, sid)
 end
 
 local function SetupStore(id)
-    if TempStoreData[id] then return end
     local cfg = Config.Store[id]
     if not cfg then return end
+    if cfg.cooldown then return end
     EData = AddEventHandler('entityDamaged', EntityDamage)
     local interior = GetInteriorAtCoords(cfg.coords.x, cfg.coords.y, cfg.coords.z)
     RefreshInterior(interior)
@@ -151,7 +205,6 @@ local function SetupStore(id)
     until IsInteriorReady(interior)
     local function UpdateConfig()
         if not lib.table.matches(cfg, Config.Store[id]) then
-            print("UPDATE CONFIG")
             cfg = Config.Store[id]
         end
     end
@@ -167,10 +220,16 @@ local function SetupStore(id)
         })
     end
     local function Hack(self)
+        if cfg.hack.isusing then return end
+        if cfg.cooldown then return end
         local success = exports['ran-minigames']:MemoryCard()
+        TriggerServerEvent("ran-storerobbery:server:setHackUse", id, true)
         if success then
             TriggerServerEvent("ran-houserobbery:server:setHackedState", self.storeid)
+            Wait(500)
+            Alert(id)
         end
+        TriggerServerEvent("ran-storerobbery:server:setHackUse", id, false)
     end
     local function OpenPinPrompt()
         local input = lib.inputDialog("Pin", {
@@ -192,6 +251,8 @@ local function SetupStore(id)
         end
     end
     local function InsideSafe(self)
+        if Config.MinPolice > CopCount then return end
+        if cfg.cooldown then return end
         ---@type vector3
         local coords = self.coords
         if cfg.safe.isopened then
@@ -216,12 +277,15 @@ local function SetupStore(id)
                 {
                     label = "Hack",
                     canInteract = function()
-                        return not cfg.hack.hacked
+                        return not cfg.hack.hacked and not cfg.hack.isusing and not cfg.alerted and not cfg.cooldown
                     end,
                     storeid = id,
                     onSelect = Hack,
                     distance = 1.0,
-                    icon = "fas fa-laptop"
+                    icon = "fas fa-laptop",
+                    items = {
+                        ['trojan_usb'] = 1
+                    }
                 }
             }
         })
@@ -232,16 +296,32 @@ local function SetupStore(id)
             ---@type OxTargetOption[]
             local options = {}
             if v.iscomputer then
-                options[#options + 1] = {
-                    label = "Search for combination",
-                    distance = 2.0,
-                    icon = "fa-solid fa-magnifying-glass",
-                    canInteract = function()
-                        return not cfg.combination
-                    end,
-                    onSelect = function()
-                        SearchCombination(CurrentStore, k)
-                    end
+                options = {
+                    {
+                        label = "Search for combination",
+                        distance = 2.0,
+                        icon = "fa-solid fa-magnifying-glass",
+                        canInteract = function()
+                            return not cfg.combination and not cfg.cooldown
+                        end,
+                        onSelect = function()
+                            SearchCombination(CurrentStore, k)
+                        end,
+                        items = {
+                            ['trojan_usb'] = 1
+                        }
+                    },
+                    {
+                        label = "Look at the combination",
+                        distance = 2.0,
+                        icon = "fa-solid fa-computer",
+                        canInteract = function()
+                            return cfg.search[k].founded and AllStashSearched(id) and not cfg.cooldown
+                        end,
+                        onSelect = function()
+                            QBCore.Functions.Notify("The pin is " .. cfg.combination)
+                        end
+                    }
                 }
             else
                 options[#options + 1] = {
@@ -249,7 +329,7 @@ local function SetupStore(id)
                     distance = 1.0,
                     icon = "fa-solid fa-magnifying-glass",
                     canInteract = function()
-                        return not cfg.combination
+                        return not cfg.combination and not cfg.cooldown
                     end,
                     onSelect = function()
                         SearchCombination(CurrentStore, k)
@@ -261,7 +341,7 @@ local function SetupStore(id)
                 size = v.size,
                 rotation = v.rotation,
                 options = options,
-                drawSprite = false
+                drawSprite = false,
             })
         end
     end
@@ -308,8 +388,61 @@ local function ResetStore(id)
         EData = nil
     end
     table.wipe(TempStoreData)
-    QBCore.Debug(TempStoreData)
 end
+
+local function ConfigContext()
+    local pnis = promise.new()
+    local opts = {}
+    for k, v in pairs(Config.Store) do
+        opts[#opts + 1] = {
+            title = ("Config Number: [%s]"):format(k),
+            description = ("Hack: %s | Register: %s | Robbed: %s"):format(v.hack and true or false, #v.registar,
+                v.alerted or false),
+            onSelect = function()
+                pnis:resolve(k)
+            end,
+        }
+    end
+    lib.registerContext({
+        id = "ran_storerobbery_config_context",
+        title = "Config",
+        options = opts,
+        onExit = function()
+            pnis:resolve(false)
+        end
+    })
+    lib.showContext('ran_storerobbery_config_context')
+    return Citizen.Await(pnis)
+end
+
+lib.callback.register("ran-storerobbery:client:openConfigContext", function()
+    return ConfigContext()
+end)
+
+lib.callback.register("ran-storerobbery:client:resetStore", function()
+    if not CurrentStore then return end
+    local cfg = Config.Store[CurrentStore]
+    if not cfg then return end
+    if cfg.cooldown then
+        QBCore.Functions.Notify("This store is already on cooldown", "error")
+        return
+    end
+    if not cfg.alerted then
+        QBCore.Functions.Notify("This store is not even robbed...", "error")
+        return
+    end
+    local alert = lib.alertDialog({
+        header = "Confirmation",
+        content = "Are you sure you want to reset the store?",
+        centered = true,
+        cancel = true
+    })
+    if alert == "confirm" then
+        return CurrentStore
+    elseif alert == "cancel" then
+        return false
+    end
+end)
 
 ---@diagnostic disable-next-line: param-type-mismatch
 AddStateBagChangeHandler('isLoggedIn', nil, function(_bagName, _key, value, _reserved, _replicated)
@@ -344,8 +477,11 @@ RegisterNetEvent("ran-storerobbery:client:setStoreConfig", function(id, cfg)
     if not id or not cfg then return end
     if not type(cfg) == "table" then return end
     if not Config.Store[id] then return end
-    print("UPDATE STORE CONFIG")
     Config.Store[id] = cfg
+end)
+
+RegisterNetEvent("police:SetCopCount", function(amount)
+    CopCount = amount
 end)
 
 CreateThread(function()

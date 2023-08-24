@@ -1,5 +1,11 @@
 ## Ran Store Robbery
 
+Dependencies:
+
+- ox lib
+- ran minigames
+- qb-core
+
 | Icon | Description   |
 | ---- | ------------- |
 | ✅   | Supported     |
@@ -25,7 +31,15 @@ Supported Target:
 - [❌] qb target
 - [❌] bt target
 
+Dispatch:
+
+- [✅] PS Dispatch
+
 > You're free to add compatibility to the script and create a pr
+
+TODO:
+
+- [⭕] Add animation when hacking the alarm delay
 
 ### Support
 

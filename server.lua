@@ -8,6 +8,42 @@ local function SendLog(title, content)
 
 end
 
+local function ResetStore(id)
+    local cfg = Config.Store[id]
+    if not cfg then return end
+    if not cfg.cooldown then return end
+    cfg.cooldown = false
+    cfg.alerted = false
+    cfg.combination = nil
+    for _, v in pairs(cfg.registar) do
+        v.robbed = false
+        v.isusing = false
+    end
+    for _, v in pairs(cfg.search) do
+        v.searched = false
+        if v.iscomputer then
+            v.founded = false
+        end
+    end
+    if cfg.safe and cfg.safe.opened then
+        cfg.safe.opened = false
+        cfg.safe.id = nil
+    end
+end
+
+local function Cooldown(storeid)
+    local cfg = Config.Store[storeid]
+    if not cfg then
+        warn("No config found for " .. storeid)
+        return
+    end
+    cfg.cooldown = true
+    SetTimeout(1000 * 60 * 60, function()
+        ResetStore(storeid)
+    end)
+    TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, cfg)
+end
+
 local function GenerateSafeItems()
     local totalChance = 0
     for item, properties in pairs(Config.Prize.safe) do
@@ -33,13 +69,8 @@ local function GenerateSafeItems()
     return selectedItems
 end
 
-RegisterCommand("testyl", function()
-    local item = GenerateSafeItems()
-    print(json.encode(item))
-end, false)
-
 local function IncludeInventoryID(id)
-    for k, v in ipairs(Config.Store) do
+    for _, v in ipairs(Config.Store) do
         if v.safe then
             if v.safe.id == id then
                 return true
@@ -67,18 +98,43 @@ RegisterNetEvent("ran-storerobbery:server:setUse", function(storeid, regid, stat
     TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, storeConfig)
 end)
 
+RegisterNetEvent("ran-storerobbery:server:setHackUse", function(storeid, status)
+    local cfg = Config.Store[storeid]
+    if not cfg then return end
+    cfg.hack.isusing = status
+    TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, cfg)
+end)
+
+RegisterNetEvent("ran-storerobbery:server:registerAlert", function(storeid, status)
+    local cfg = Config.Store[storeid]
+    if not cfg then return end
+    cfg.alerted = status
+    SetTimeout(1000 * 60 * 60, function()
+        cfg = Config.Store[storeid]
+        if not cfg then return end
+        if not cfg.cooldown then
+            ResetStore(storeid)
+        end
+    end)
+    TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, cfg)
+end)
+
 AddEventHandler('onResourceStart', function(resource)
     if resource ~= cache.resource then return end
     SetupStore()
 end)
 
 RegisterNetEvent("ran-houserobbery:server:setHackedState", function(storeid)
+    local src = source
     local cfg = Config.Store[storeid]
     if not cfg then
         warn("No config found for " .. storeid)
         return
     end
     cfg.hack.hacked = true
+    local delayCount = math.random(60, 90)
+    cfg.hack.delayCount = delayCount
+    TriggerClientEvent("QBCore:Notify", src, "The alarm will be delayed for " .. math.floor(delayCount) .. " seconds")
     TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, cfg)
 end)
 
@@ -95,7 +151,6 @@ lib.callback.register("ran-houserobbery:server:getPrize", function(source, prize
     else
         xPlayer.Functions.AddMoney('cash', prize, 'rob')
     end
-    QBCore.Debug(xPlayer)
     TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, config)
     return true
 end)
@@ -107,20 +162,23 @@ lib.callback.register("ran-storerobbery:server:combination", function(source, st
     if not scfg then return end
     if status then
         local combination = GenerateCombination()
-        local xPlayer = QBCore.Functions.GetPlayer(source)
-        if not xPlayer then return end
-        xPlayer.Functions.AddItem('stickynote', 1, nil, {
-            combination = combination
-        })
         cfg.combination = tonumber(combination)
+        if scfg.iscomputer then
+            scfg.founded = true
+        else
+            local xPlayer = QBCore.Functions.GetPlayer(source)
+            if not xPlayer then return end
+            xPlayer.Functions.AddItem('stickynote', 1, nil, {
+                combination = combination
+            })
+        end
     end
     scfg.searched = true
-    print(lib.table.matches(cfg, Config.Store[storeid]))
     TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, cfg)
     return true
 end)
 
-lib.callback.register("ran-storerobbery:server:setSafeState", function(source, storeid)
+lib.callback.register("ran-storerobbery:server:setSafeState", function(_, storeid)
     local config = Config.Store[storeid]
     if not config then return end
     if config.safe.opened and config.safe.id then return end
@@ -133,6 +191,37 @@ lib.callback.register("ran-storerobbery:server:setSafeState", function(source, s
     })
     TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, config)
     return true
+end)
+
+lib.addCommand("reset-store", {
+    help = "Reset Store (Store Robbery)"
+}, function(source)
+    if source == 0 or not source then return end
+    local xPlayer = QBCore.Functions.GetPlayer(source)
+    if not xPlayer then return end
+    local job = xPlayer.PlayerData.job
+    if not job then return end
+    if job.name ~= "police" then return end
+    local sc = lib.callback.await("ran-storerobbery:client:resetStore", source)
+    if sc then
+        Cooldown(sc)
+    end
+end)
+
+lib.addCommand("get-store-config", {
+    help = "Get Store Config (ADMIN ONLY)",
+    restricted = 'group.admin'
+}, function(source)
+    ---@type number | false
+    local cb = lib.callback.await("ran-storerobbery:client:openConfigContext", source)
+    if cb then
+        local cfg = Config.Store[cb]
+        if not cfg then return end
+        local ped = GetPlayerPed(source)
+        if not ped then return end
+        local coords = cfg.coords
+        SetEntityCoords(ped, coords.x, coords.y, coords.z - 1.0, true, false, false, false)
+    end
 end)
 
 local hookid
