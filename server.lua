@@ -1,4 +1,5 @@
 local QBCore = exports['qb-core']:GetCoreObject()
+local hookid
 
 local function SetupStore()
     TriggerClientEvent("ran-storerobbery:client:setConfigs", -1, Config.Store)
@@ -122,6 +123,19 @@ end)
 AddEventHandler('onResourceStart', function(resource)
     if resource ~= cache.resource then return end
     SetupStore()
+    if Config.Inventory == "ox" then
+        hookid = exports.ox_inventory:registerHook("swapItems", function(payload)
+            if payload.fromType == "player" and IncludeInventoryID(payload.toInventory) then
+                return false
+            else
+                return true
+            end
+        end, {
+            inventoryFilter = {
+                '^temp-[%w]+',
+            }
+        })
+    end
 end)
 
 RegisterNetEvent("ran-houserobbery:server:setHackedState", function(storeid)
@@ -224,20 +238,8 @@ lib.addCommand("get-store-config", {
     end
 end)
 
-local hookid
-CreateThread(function()
-    hookid = exports.ox_inventory:registerHook("swapItems", function(payload)
-        if payload.fromType == "player" and IncludeInventoryID(payload.toInventory) then
-            return false
-        else
-            return true
-        end
-    end, {
-        inventoryFilter = {
-            '^temp-[%w]+',
-        }
-    })
-end)
+
+
 
 AddEventHandler('onResourceStop', function(resource)
     if resource == GetCurrentResourceName() then

@@ -5,6 +5,8 @@ local CurrentStore
 local InRegZone, RegZoneID = false, nil
 local TempStoreData = {}
 local ox_inventory = exports.ox_inventory
+local ox_target = exports.ox_target
+local qb_target = exports['qb-target']
 local CopCount = 0
 
 local function SendDispatch()
@@ -118,10 +120,12 @@ local function RobRegistar()
     local prize = math.floor(math.random(Config.Prize.min, Config.Prize.max))
     local success = exports['ran-minigames']:MineSweep(prize, 10, 3, "left")
     if success then
+        local itemName = Config.Inventory == "ox" and ox_inventory:Items(Config.Prize.item).label or
+            QBCore.Shared.Items[Config.Prize.item]?.label
         lib.callback("ran-houserobbery:server:getPrize", false, function(cb)
             QBCore.Functions.Notify(
                 ("You got %s %s"):format(success,
-                    Config.Prize.item and ox_inventory:Items(Config.Prize.item).label or "Cash"), "success")
+                    Config.Prize.item and itemName or "Cash"), "success")
         end, success, CurrentStore, RegZoneID)
     end
     TaskPlayAnim(ped, anim, "exit", 8.0, 8.0, -1, 0, 1.0, false, false, false)
@@ -267,38 +271,59 @@ local function SetupStore(id)
         end
         if IsControlJustPressed(0, 46) then
             if cfg.safe.isopened and cfg.safe.id then
-                ox_inventory:openInventory("stash", cfg.safe.id)
+                if Config.Inventory == "qb" then
+                    TriggerServerEvent("inventory:server:OpenInventory", "stash", cfg.safe.id,
+                        { maxweight = 10000, slots = 50 })
+                    TriggerEvent("inventory:client:SetCurrentStash", cfg.safe.id)
+                elseif Config.Inventory == "ox" then
+                    ox_inventory:openInventory("stash", cfg.safe.id)
+                end
             else
                 OpenPinPrompt()
             end
         end
     end
     if cfg.hack then
-        TempStoreData.hack = exports.ox_target:addBoxZone({
-            coords = cfg.hack.coords,
-            size = cfg.hack.size,
-            rotation = cfg.hack.rotation,
-            options = {
-                {
-                    label = "Hack",
-                    canInteract = function()
-                        return not cfg.hack.hacked and not cfg.hack.isusing and not cfg.alerted and not cfg.cooldown
-                    end,
-                    storeid = id,
-                    onSelect = Hack,
-                    distance = 1.0,
-                    icon = "fas fa-laptop",
-                    items = {
-                        ['trojan_usb'] = 1
-                    }
-                }
+        local options = {
+            {
+                label = "Hack",
+                canInteract = function()
+                    return not cfg.hack.hacked and not cfg.hack.isusing and not cfg.alerted and not cfg.cooldown
+                end,
+                storeid = id,
+                distance = 1.0,
+                icon = "fas fa-laptop",
             }
-        })
+        }
+        if Config.Target == "qb" then
+            options[1].action = Hack
+            options[1].item = "trojan_usb"
+            local length = cfg.hack.size.x
+            local width = cfg.hack.size.y
+            TempStoreData.hack = qb_target:AddBoxZOne('ran_robbery_hack', cfg.hack.coords, length,
+                width, {
+                    heading = cfg.hack.rotation,
+                    debugPoly = true,
+                    minZ = cfg.hack.coords.z - cfg.hack.size.z,
+                    maxZ = cfg.hack.coords.z + cfg.hack.size.z
+                }, options)
+        elseif Config.Target == "ox" then
+            options[1].items = {
+                ['trojan_usb'] = 1
+            }
+            options[1].onSelect = Hack
+            TempStoreData.hack = ox_target:addBoxZone({
+                coords = cfg.hack.coords,
+                size = cfg.hack.size,
+                rotation = cfg.hack.rotation,
+                options = options
+            })
+        end
     end
     if cfg.search then
         TempStoreData.search = {}
         for k, v in pairs(cfg.search) do
-            ---@type OxTargetOption[]
+            ---@type OxTargetOption[] | any[]
             local options = {}
             if v.iscomputer then
                 options = {
@@ -309,12 +334,6 @@ local function SetupStore(id)
                         canInteract = function()
                             return not cfg.combination and not cfg.cooldown
                         end,
-                        onSelect = function()
-                            SearchCombination(CurrentStore, k)
-                        end,
-                        items = {
-                            ['trojan_usb'] = 1
-                        }
                     },
                     {
                         label = "Look at the combination",
@@ -323,31 +342,71 @@ local function SetupStore(id)
                         canInteract = function()
                             return cfg.search[k].founded and AllStashSearched(id) and not cfg.cooldown
                         end,
-                        onSelect = function()
-                            QBCore.Functions.Notify("The pin is " .. cfg.combination)
-                        end
                     }
                 }
-            else
-                options[#options + 1] = {
-                    label = "Search for combination",
-                    distance = 1.0,
-                    icon = "fa-solid fa-magnifying-glass",
-                    canInteract = function()
-                        return not cfg.combination and not cfg.cooldown
-                    end,
-                    onSelect = function()
+                if Config.Target == "qb" then
+                    options[1].action = function()
                         SearchCombination(CurrentStore, k)
                     end
+                    options[1].item = "trojan_usb"
+                    options[2].action = function()
+                        QBCore.Functions.Notify("The pin is " .. cfg.combination)
+                    end
+                elseif Config.Target == "ox" then
+                    options[1].onSelect = function()
+                        SearchCombination(CurrentStore, k)
+                    end
+                    options[1].items = {
+                        ['trojan_usb'] = 1
+                    }
+                    options[2].onSelect = function()
+                        QBCore.Functions.Notify("The pin is " .. cfg.combination)
+                    end
+                end
+            else
+                options = {
+                    {
+                        label = "Search for combination",
+                        distance = 1.0,
+                        icon = "fa-solid fa-magnifying-glass",
+                        canInteract = function()
+                            return not cfg.combination and not cfg.cooldown
+                        end,
+                    }
                 }
+                if Config.Target == "qb" then
+                    options[1].action = function()
+                        SearchCombination(CurrentStore, k)
+                    end
+                elseif Config.Target == "ox" then
+                    options[1].onSelect = function()
+                        SearchCombination(CurrentStore, k)
+                    end
+                end
             end
-            TempStoreData.search[k] = exports.ox_target:addBoxZone({
-                coords = v.coords,
-                size = v.size,
-                rotation = v.rotation,
-                options = options,
-                drawSprite = false,
-            })
+            if Config.Target == "qb" then
+                local length = v.size.x
+                local width = v.size.y
+                local minZ = v.coords.z - v.size.z
+                local maxZ = v.coords.z + v.size.z
+                TempStoreData.search[k] = qb_target:AddBoxZOne('ran_robbery_search_' .. k, v.coords.xyz, length, width, {
+                    name = 'ran_robbery_search_' .. k,
+                    heading = v.rotation,
+                    debugPoly = true,
+                    minZ = minZ,
+                    maxZ = maxZ
+                }, {
+                    options = options,
+                })
+            elseif Config.Target == "ox" then
+                TempStoreData.search[k] = exports.ox_target:addBoxZone({
+                    coords = v.coords,
+                    size = v.size,
+                    rotation = v.rotation,
+                    options = options,
+                    drawSprite = false,
+                })
+            end
         end
     end
     if cfg.safe then
@@ -371,18 +430,20 @@ local function ResetStore(id)
         exports.ox_target:removeZone(TempStoreData.hack)
     end
     if TempStoreData.registar then
-        for k, v in pairs(TempStoreData.registar) do
+        for _, v in pairs(TempStoreData.registar) do
             if v.zone then
                 v.zone:remove()
-            end
-            if v.entity then
-                exports.ox_target:removeLocalEntity(v.entity)
             end
         end
     end
     if TempStoreData.search then
         for _, v in pairs(TempStoreData.search) do
-            exports.ox_target:removeZone(v)
+            if Config.Target == "qb" then
+                print(json.encode(v, { indent = true }))
+                qb_target:RemoveZone(v.id)
+            elseif Config.Target == "ox" then
+                ox_target:removeZone(v)
+            end
         end
     end
     if TempStoreData.safe then
@@ -453,9 +514,11 @@ end)
 AddStateBagChangeHandler('isLoggedIn', nil, function(_bagName, _key, value, _reserved, _replicated)
     if value then
         PlayerData = QBCore.Functions.GetPlayerData()
-        ox_inventory:displayMetadata({
-            combination = "Combination"
-        })
+        if Config.Inventory == "ox" then
+            ox_inventory:displayMetadata({
+                combination = "Combination"
+            })
+        end
     else
         table.wipe(PlayerData)
     end
@@ -511,13 +574,23 @@ CreateThread(function()
 end)
 
 CreateThread(function()
-    exports.ox_target:addModel('prop_till_01', {
-        label = "Grab Cash",
-        canInteract = function(entity, distance, coords, name, bone)
-            return entity and GetEntityHealth(entity) < 1000 and CurrentStore and not Config.Store[CurrentStore]
-                .cooldown
-        end,
-        icon = "fa-solid fa-cash-register",
-        onSelect = RobRegistar
-    })
+    local options = {
+        {
+            label = "Grab Cash",
+            canInteract = function(entity, distance, coords, name, bone)
+                return entity and GetEntityHealth(entity) < 1000 and CurrentStore and not Config.Store[CurrentStore]
+                    .cooldown
+            end,
+            icon = "fa-solid fa-cash-register",
+        }
+    }
+    if Config.Target == "qb" then
+        options[1].action = RobRegistar
+        qb_target:AddTargetModel('prop_till_01', {
+            options = options
+        })
+    elseif Config.Target == "ox" then
+        options[1].onSelect = RobRegistar
+        ox_target:addModel('prop_till_01', options)
+    end
 end)

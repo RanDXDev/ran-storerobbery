@@ -3,6 +3,10 @@ Config = Config or {}
 
 Config.MinPolice = 0
 
+Config.Inventory = "qb" -- qb / ox
+
+Config.Target = "qb"    -- qb or ox
+
 Config.Prize = {
     min = 1000,
     max = 12000,
