@@ -404,6 +404,7 @@ local function SetupStore(id)
                     rotation = v.rotation,
                     options = options,
                     drawSprite = false,
+
                 })
             end
         end
@@ -463,8 +464,10 @@ local function ConfigContext()
     local opts = {}
     for k, v in pairs(Config.Store) do
         opts[#opts + 1] = {
-            title = ("Config Number: [%s]"):format(k),
-            description = ("Hack: %s | Register: %s | Robbed: %s"):format(v.hack and true or false, #v.registar,
+            title = ("Config Number: [%s] %s"):format(k, CurrentStore == k and "| Current Store" or " "),
+            description = ("Hack: %s  | Register: %s  | Robbed: %s"):format(
+                v.hack and true or false,
+                #v.registar,
                 v.alerted or false),
             onSelect = function()
                 pnis:resolve(k)
