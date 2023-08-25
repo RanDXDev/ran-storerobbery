@@ -3,9 +3,9 @@ Config = Config or {}
 
 Config.MinPolice = 0
 
-Config.Inventory = "qb" -- qb / ox
+Config.Inventory = "ox" -- qb / ox
 
-Config.Target = "qb"    -- qb or ox
+Config.Target = "ox"    -- qb or ox
 
 Config.Prize = {
     min = 1000,
@@ -250,9 +250,9 @@ Config.Store = {
                 rotation = 300.25,
             },
             [3] = {
-                coords = vec3(1962.1, 3750.6, 31.85),
-                size = vec3(0.65, 0.35, 1.0),
-                rotation = 300.25,
+                coords = vec3(1960.05, 3750.25, 32.4),
+                size = vec3(0.55, 0.3, 0.45),
+                rotation = 25.5,
                 iscomputer = true
             }
         },
