@@ -1,4 +1,11 @@
 local QBCore = exports['qb-core']:GetCoreObject()
+local hookid
+
+local StringCharset = {}
+local NumberCharset = {}
+for i = 48, 57 do NumberCharset[#NumberCharset + 1] = string.char(i) end
+for i = 65, 90 do StringCharset[#StringCharset + 1] = string.char(i) end
+for i = 97, 122 do StringCharset[#StringCharset + 1] = string.char(i) end
 
 local function SetupStore()
     TriggerClientEvent("ran-storerobbery:client:setConfigs", -1, Config.Store)
@@ -6,6 +13,16 @@ end
 
 local function SendLog(title, content)
 
+end
+
+local function RandomStr(length)
+    if length <= 0 then return '' end
+    return RandomStr(length - 1) .. StringCharset[math.random(1, #StringCharset)]
+end
+
+local function RandomInt(length)
+    if length <= 0 then return '' end
+    return RandomInt(length - 1) .. NumberCharset[math.random(1, #NumberCharset)]
 end
 
 local function ResetStore(id)
@@ -65,7 +82,6 @@ local function GenerateSafeItems()
             }
         end
     end
-
     return selectedItems
 end
 
@@ -81,7 +97,7 @@ local function IncludeInventoryID(id)
 end
 
 local function GenerateCombination()
-    return QBCore.Shared.RandomInt(4)
+    return RandomInt(4)
 end
 
 RegisterNetEvent("ran-storerobbery:server:getConfig", function()
@@ -122,6 +138,19 @@ end)
 AddEventHandler('onResourceStart', function(resource)
     if resource ~= cache.resource then return end
     SetupStore()
+    if Config.Inventory == "ox" then
+        hookid = exports.ox_inventory:registerHook("swapItems", function(payload)
+            if payload.fromType == "player" and IncludeInventoryID(payload.toInventory) then
+                return false
+            else
+                return true
+            end
+        end, {
+            inventoryFilter = {
+                '^temp-[%w]+',
+            }
+        })
+    end
 end)
 
 RegisterNetEvent("ran-houserobbery:server:setHackedState", function(storeid)
@@ -146,8 +175,14 @@ lib.callback.register("ran-houserobbery:server:getPrize", function(source, prize
     regConfig.robbed = true
     local xPlayer = QBCore.Functions.GetPlayer(source)
     if not xPlayer then return end
-    if Config.Prize.item then
-        xPlayer.Functions.AddItem(Config.Prize.item, prize, nil, nil)
+    local item
+    if Config.Inventory == "qb" then
+        item = QBCore.Shared.Items[Config.Prize.item]?.name
+    elseif Config.Inventory == "ox" then
+        item = exports.ox_inventory:Items(Config.Prize.item).name
+    end
+    if Config.Prize.item and item then
+        xPlayer.Functions.AddItem(item, prize, nil, nil)
     else
         xPlayer.Functions.AddMoney('cash', prize, 'rob')
     end
@@ -178,17 +213,54 @@ lib.callback.register("ran-storerobbery:server:combination", function(source, st
     return true
 end)
 
+
 lib.callback.register("ran-storerobbery:server:setSafeState", function(_, storeid)
     local config = Config.Store[storeid]
     if not config then return end
     if config.safe.opened and config.safe.id then return end
     config.safe.isopened = true
-    config.safe.id = exports.ox_inventory:CreateTemporaryStash({
-        label = "Safe",
-        slots = 10,
-        maxWeight = 30000,
-        items = GenerateSafeItems()
-    })
+    if Config.Inventory == "qb" then
+        local stashid = RandomStr(2) .. RandomInt(2) .. RandomStr(2)
+        local items = {}
+        local itemList = GenerateSafeItems()
+        for _, v in pairs(itemList) do
+            ---@type string
+            local itemname = v[1]
+            ---@type number
+            local itemCount = v[2]
+            local itemInfo = QBCore.Shared.Items[itemname]
+            if itemInfo then
+                items[#items + 1] = {
+                    name = itemInfo.name,
+                    amount = tonumber(itemCount),
+                    info = {},
+                    label = itemInfo.label,
+                    description = itemInfo.description ~= nil and itemInfo.description or "",
+                    weight = itemInfo.weight,
+                    type = itemInfo.type,
+                    unique = itemInfo.unique,
+                    useable = itemInfo.useable,
+                    image = itemInfo.image,
+                    slot = #items + 1
+                }
+            else
+                warn("Can't find iteminfo for " .. itemname)
+            end
+        end
+        MySQL.insert.await(
+            "INSERT INTO stashitems (stash, items) VALUES (:stash, :items) ON DUPLICATE KEY UPDATE items = :items", {
+                ['stash'] = stashid,
+                ['items'] = json.encode(items)
+            })
+        config.safe.id = stashid
+    elseif Config.Inventory == "ox" then
+        config.safe.id = exports.ox_inventory:CreateTemporaryStash({
+            label = "Safe",
+            slots = 10,
+            maxWeight = 30000,
+            items = GenerateSafeItems()
+        })
+    end
     TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, config)
     return true
 end)
@@ -224,20 +296,16 @@ lib.addCommand("get-store-config", {
     end
 end)
 
-local hookid
-CreateThread(function()
-    hookid = exports.ox_inventory:registerHook("swapItems", function(payload)
-        if payload.fromType == "player" and IncludeInventoryID(payload.toInventory) then
-            return false
-        else
-            return true
-        end
-    end, {
-        inventoryFilter = {
-            '^temp-[%w]+',
-        }
-    })
+QBCore.Functions.CreateUseableItem('stickynote', function(source, item)
+    if item.info then
+        TriggerClientEvent("QBCore:Notify", source, "Combination: " .. item.info.combination)
+    elseif item.metadata then
+        TriggerClientEvent("QBCore:Notify", source, "Combination: " .. item.metadata.combination)
+    end
 end)
+
+
+
 
 AddEventHandler('onResourceStop', function(resource)
     if resource == GetCurrentResourceName() then
