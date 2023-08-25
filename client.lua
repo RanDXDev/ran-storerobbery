@@ -304,7 +304,6 @@ local function SetupStore(id)
                 width, {
                     name = 'ran_robbery_hack',
                     heading = cfg.hack.rotation,
-                    debugPoly = true,
                     minZ = cfg.hack.coords.z - cfg.hack.size.z,
                     maxZ = cfg.hack.coords.z + cfg.hack.size.z
                 }, options)
@@ -393,7 +392,6 @@ local function SetupStore(id)
                 TempStoreData.search[k] = qb_target:AddBoxZone('ran_robbery_search_' .. k, v.coords.xyz, length, width, {
                     name = 'ran_robbery_search_' .. k,
                     heading = v.rotation,
-                    debugPoly = true,
                     minZ = minZ,
                     maxZ = maxZ
                 }, {
