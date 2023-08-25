@@ -161,7 +161,7 @@ local function SearchCombination(storeid, sid)
         TaskPlayAnim(cache.ped, animdict, anim, 8.0, 8.0, -1, 1, 1.0, false, false, false)
         local success = exports['ran-minigames']:OpenTerminal()
         if success then
-            local canGet = math.random(1, 100) > 50 and true or false
+            local canGet = math.random(1, 100) > 20 and true or false
             if canGet then
                 local TimeToWait = math.random(20, 30)
                 searchLoc.searched = true
@@ -273,7 +273,7 @@ local function SetupStore(id)
             if cfg.safe.isopened and cfg.safe.id then
                 if Config.Inventory == "qb" then
                     TriggerServerEvent("inventory:server:OpenInventory", "stash", cfg.safe.id,
-                        { maxweight = 10000, slots = 50 })
+                        { maxweight = 1000000, slots = 10 })
                     TriggerEvent("inventory:client:SetCurrentStash", cfg.safe.id)
                 elseif Config.Inventory == "ox" then
                     ox_inventory:openInventory("stash", cfg.safe.id)
@@ -300,8 +300,9 @@ local function SetupStore(id)
             options[1].item = "trojan_usb"
             local length = cfg.hack.size.x
             local width = cfg.hack.size.y
-            TempStoreData.hack = qb_target:AddBoxZOne('ran_robbery_hack', cfg.hack.coords, length,
+            TempStoreData.hack = qb_target:AddBoxZone('ran_robbery_hack', cfg.hack.coords, length,
                 width, {
+                    name = 'ran_robbery_hack',
                     heading = cfg.hack.rotation,
                     debugPoly = true,
                     minZ = cfg.hack.coords.z - cfg.hack.size.z,
@@ -389,7 +390,7 @@ local function SetupStore(id)
                 local width = v.size.y
                 local minZ = v.coords.z - v.size.z
                 local maxZ = v.coords.z + v.size.z
-                TempStoreData.search[k] = qb_target:AddBoxZOne('ran_robbery_search_' .. k, v.coords.xyz, length, width, {
+                TempStoreData.search[k] = qb_target:AddBoxZone('ran_robbery_search_' .. k, v.coords.xyz, length, width, {
                     name = 'ran_robbery_search_' .. k,
                     heading = v.rotation,
                     debugPoly = true,
@@ -427,7 +428,11 @@ end
 
 local function ResetStore(id)
     if TempStoreData.hack then
-        exports.ox_target:removeZone(TempStoreData.hack)
+        if Config.Target == "ox" then
+            ox_target:removeZone(TempStoreData.hack)
+        elseif Config.Target == "qb" then
+            qb_target:RemoveZone(TempStoreData.hack?.name)
+        end
     end
     if TempStoreData.registar then
         for _, v in pairs(TempStoreData.registar) do
@@ -439,8 +444,7 @@ local function ResetStore(id)
     if TempStoreData.search then
         for _, v in pairs(TempStoreData.search) do
             if Config.Target == "qb" then
-                print(json.encode(v, { indent = true }))
-                qb_target:RemoveZone(v.id)
+                qb_target:RemoveZone(v.name)
             elseif Config.Target == "ox" then
                 ox_target:removeZone(v)
             end
