@@ -21,14 +21,14 @@ Supported Framework:
 Supporeted Inventory:
 
 - [✅] ox inventory
-- [❌] qb inventory
-- [❌] lj inventory
-- [❌] ps inventory
+- [✅] qb inventory
+- [✅] lj inventory
+- [✅] ps inventory
 
 Supported Target:
 
 - [✅] ox target
-- [❌] qb target
+- [✅] qb target
 - [❌] bt target
 
 Dispatch:
