@@ -1,8 +1,9 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 local hookid
-
 local StringCharset = {}
 local NumberCharset = {}
+
+local webhook
 for i = 48, 57 do NumberCharset[#NumberCharset + 1] = string.char(i) end
 for i = 65, 90 do StringCharset[#StringCharset + 1] = string.char(i) end
 for i = 97, 122 do StringCharset[#StringCharset + 1] = string.char(i) end
@@ -11,8 +12,33 @@ local function SetupStore()
     TriggerClientEvent("ran-storerobbery:client:setConfigs", -1, Config.Store)
 end
 
-local function SendLog(title, content)
-
+local function SendLog(title, content, tageveryone)
+    if not webhook then
+        warn("No webhook link for " .. GetCurrentResourceName())
+        return
+    end
+    local embedData = {
+        username = "Store Robbery",
+        embeds = {
+            {
+                title = title,
+                color = 16711680,
+                footer = {
+                    text = os.date('%c')
+                },
+                description = content,
+                author = {
+                    name = "Store Robbery",
+                    icon_url =
+                    "https://media.discordapp.net/attachments/1139589833459761175/1144841078223159326/logo.png"
+                }
+            }
+        }
+    }
+    if tageveryone then
+        embedData.content = "@everyone"
+    end
+    PerformHttpRequest(webhook, function() end, 'POST', json.encode(embedData), { ['Content-Type'] = 'application/json' })
 end
 
 local function RandomStr(length)
@@ -58,6 +84,7 @@ local function Cooldown(storeid)
     SetTimeout(1000 * 60 * 60, function()
         ResetStore(storeid)
     end)
+    SendLog("Robbery end", ("Robbery with storeid: %s has ended"):format(storeid))
     TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, cfg)
 end
 
@@ -122,8 +149,10 @@ RegisterNetEvent("ran-storerobbery:server:setHackUse", function(storeid, status)
 end)
 
 RegisterNetEvent("ran-storerobbery:server:registerAlert", function(storeid, status)
+    local src = source
     local cfg = Config.Store[storeid]
     if not cfg then return end
+    if cfg.alerted == status then return end
     cfg.alerted = status
     SetTimeout(1000 * 60 * 60, function()
         cfg = Config.Store[storeid]
@@ -132,6 +161,7 @@ RegisterNetEvent("ran-storerobbery:server:registerAlert", function(storeid, stat
             ResetStore(storeid)
         end
     end)
+    SendLog("Robbery Started", ("%s has started a robbery, storeid: %s"):format(GetPlayerName(src), storeid))
     TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, cfg)
 end)
 
@@ -153,14 +183,15 @@ AddEventHandler('onResourceStart', function(resource)
     end
 end)
 
-RegisterNetEvent("ran-houserobbery:server:setHackedState", function(storeid)
+RegisterNetEvent("ran-houserobbery:server:setHackedState", function(storeid, status)
     local src = source
     local cfg = Config.Store[storeid]
     if not cfg then
         warn("No config found for " .. storeid)
         return
     end
-    cfg.hack.hacked = true
+    if cfg.hack.hacked == status then return end
+    cfg.hack.hacked = status
     local delayCount = math.random(60, 90)
     cfg.hack.delayCount = delayCount
     TriggerClientEvent("QBCore:Notify", src, "The alarm will be delayed for " .. math.floor(delayCount) .. " seconds")
@@ -172,20 +203,24 @@ lib.callback.register("ran-houserobbery:server:getPrize", function(source, prize
     if not config then return end
     local regConfig = config.registar[regid]
     if not regConfig then return end
+    if regConfig.robbed then return end
     regConfig.robbed = true
     local xPlayer = QBCore.Functions.GetPlayer(source)
     if not xPlayer then return end
-    local item
+    local itemExist
     if Config.Inventory == "qb" then
-        item = QBCore.Shared.Items[Config.Prize.item]?.name
+        itemExist = QBCore.Shared.Items[Config.Prize.item]
     elseif Config.Inventory == "ox" then
-        item = exports.ox_inventory:Items(Config.Prize.item).name
+        itemExist = exports.ox_inventory:Items(Config.Prize.item)
     end
-    if Config.Prize.item and item then
-        xPlayer.Functions.AddItem(item, prize, nil, nil)
+    if Config.Prize.item and itemExist then
+        xPlayer.Functions.AddItem(Config.Prize.item, prize, nil, nil)
     else
         xPlayer.Functions.AddMoney('cash', prize, 'rob')
     end
+    SendLog("Get Prize",
+        ("%s are robbing a register and got %s %s"):format(GetPlayerName(source), prize,
+            itemExist and itemExist.label or "cash"), prize >= Config.Prize.max)
     TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, config)
     return true
 end)

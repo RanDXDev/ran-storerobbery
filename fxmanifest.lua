@@ -1,6 +1,6 @@
 fx_version 'cerulean'
 
-version '1.0.0'
+version '1.0.1'
 
 game 'gta5'
 
