@@ -234,7 +234,7 @@ local function SetupStore(id)
         local success = exports['ran-minigames']:MemoryCard()
         TriggerServerEvent("ran-storerobbery:server:setHackUse", id, true)
         if success then
-            TriggerServerEvent("ran-houserobbery:server:setHackedState", self.storeid)
+            TriggerServerEvent("ran-houserobbery:server:setHackedState", self.storeid, true)
             Wait(500)
             Alert(id)
         end
@@ -290,13 +290,14 @@ local function SetupStore(id)
                 canInteract = function()
                     return not cfg.hack.hacked and not cfg.hack.isusing and not cfg.alerted and not cfg.cooldown
                 end,
-                storeid = id,
                 distance = 1.0,
                 icon = "fas fa-laptop",
             }
         }
         if Config.Target == "qb" then
-            options[1].action = Hack
+            options[1].action = function()
+                Hack({ storeid = id })
+            end
             options[1].item = "trojan_usb"
             local length = cfg.hack.size.x
             local width = cfg.hack.size.y
@@ -306,7 +307,9 @@ local function SetupStore(id)
                     heading = cfg.hack.rotation,
                     minZ = cfg.hack.coords.z - cfg.hack.size.z,
                     maxZ = cfg.hack.coords.z + cfg.hack.size.z
-                }, options)
+                }, {
+                    options = options
+                })
         elseif Config.Target == "ox" then
             options[1].items = {
                 ['trojan_usb'] = 1
