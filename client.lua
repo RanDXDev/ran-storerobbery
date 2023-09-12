@@ -118,18 +118,31 @@ local function RobRegistar()
     lib.requestAnimDict(anim)
     TaskPlayAnim(ped, anim, animname, 8.0, 8.0, -1, 3, 1.0, false, false, false)
     local prize = math.floor(math.random(Config.Prize.min, Config.Prize.max))
-    local success = exports['ran-minigames']:MineSweep(prize, 10, 3, "left")
-    if success then
-        local itemName = Config.Inventory == "ox" and ox_inventory:Items(Config.Prize.item).label or
-            QBCore.Shared.Items[Config.Prize.item]?.label
-        lib.callback("ran-houserobbery:server:getPrize", false, function(cb)
-            QBCore.Functions.Notify(
-                ("You got %s %s"):format(success,
-                    Config.Prize.item and itemName or "Cash"), "success")
-        end, success, CurrentStore, RegZoneID)
+
+    if lib.progressBar({
+            duration = Config.RegisterSearchTime,
+            label = 'Rummaging For Cash',
+            useWhileDead = false,
+            canCancel = true,
+            disable = {
+                car = true,
+                move = true,
+            },
+        }) then
+        local success = exports['ran-minigames']:MineSweep(prize, 10, 3, "left")
+        if success then
+            local itemName = Config.Inventory == "ox" and ox_inventory:Items(Config.Prize.item).label or
+                QBCore.Shared.Items[Config.Prize.item]?.label
+            lib.callback("ran-houserobbery:server:getPrize", false, function(cb)
+                QBCore.Functions.Notify(
+                    ("You got %s %s"):format(success,
+                        Config.Prize.item and itemName or "Cash"), "success")
+            end, success, CurrentStore, RegZoneID)
+        end
+    else
+        TaskPlayAnim(ped, anim, "exit", 8.0, 8.0, -1, 0, 1.0, false, false, false)
+        TriggerServerEvent("ran-storerobbery:server:setUse", CurrentStore, RegZoneID, false)
     end
-    TaskPlayAnim(ped, anim, "exit", 8.0, 8.0, -1, 0, 1.0, false, false, false)
-    TriggerServerEvent("ran-storerobbery:server:setUse", CurrentStore, RegZoneID, false)
 end
 
 local EData = nil
@@ -207,11 +220,6 @@ local function SetupStore(id)
     if not cfg then return end
     if cfg.cooldown then return end
     EData = AddEventHandler('entityDamaged', EntityDamage)
-    local interior = GetInteriorAtCoords(cfg.coords.x, cfg.coords.y, cfg.coords.z)
-    RefreshInterior(interior)
-    repeat
-        Wait(500)
-    until IsInteriorReady(interior)
     local function UpdateConfig()
         if not lib.table.matches(cfg, Config.Store[id]) then
             cfg = Config.Store[id]

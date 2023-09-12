@@ -7,6 +7,8 @@ Config.Inventory = "ox" -- qb / ox
 
 Config.Target = "ox"    -- qb or ox
 
+Config.RegisterSearchTime = 25000
+
 Config.Prize = {
     min = 1000,
     max = 12000,
