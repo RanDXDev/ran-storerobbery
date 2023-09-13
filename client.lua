@@ -239,13 +239,13 @@ local function SetupStore(id)
             onExit = Exit
         })
     end
-    local function Hack(self)
+    local function Hack()
         if cfg.hack.isusing then return end
         if cfg.cooldown then return end
         local success = exports['ran-minigames']:MemoryCard()
         TriggerServerEvent("ran-storerobbery:server:setHackUse", id, true)
         if success then
-            TriggerServerEvent("ran-houserobbery:server:setHackedState", self.storeid, true)
+            TriggerServerEvent("ran-houserobbery:server:setHackedState", id, true)
             Wait(500)
             Alert(id)
         end
@@ -306,9 +306,7 @@ local function SetupStore(id)
             }
         }
         if Config.Target == "qb" then
-            options[1].action = function()
-                Hack({ storeid = id })
-            end
+            options[1].action = Hack
             options[1].item = Config.HackItem
             local length = cfg.hack.size.x
             local width = cfg.hack.size.y
