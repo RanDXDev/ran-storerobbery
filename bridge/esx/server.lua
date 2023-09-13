@@ -3,15 +3,13 @@ ESX = exports["es_extended"]:getSharedObject()
 local ox_inventory = exports.ox_inventory
 
 function Functions.CreateUseableItem(itemname, cb)
-    ESX.RegisterUsableItem(itemname, function(playerid, item)
-        cb(playerid, item)
+    ESX.RegisterUsableItem(itemname, function(playerid, _, metadata)
+        cb(playerid, metadata)
     end)
 end
 
 function Functions.NotifyClient(src, text)
-    local xPlayer = ESX.GetPlayerFromId(src)
-    if not xPlayer then return end
-    xPlayer.showNotification(text)
+    TriggerClientEvent('esx:showNotification', src, text)
 end
 
 function Functions.AddItem(src, itemname, count, metadata)
@@ -46,3 +44,14 @@ function Functions.AddMoney(src, type, amount)
     end
     xPlayer.addAccountMoney(type, amount)
 end
+
+function SetCopCount()
+    local police = ESX.GetExtendedPlayers('job', 'police')
+    TriggerClientEvent("ran-storerobbery:client:setCopCount", -1, #police)
+    SetTimeout(10000, SetCopCount)
+end
+
+CreateThread(function()
+    Wait(1000)
+    SetCopCount()
+end)
