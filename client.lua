@@ -4,7 +4,7 @@ local TempStoreData = {}
 local ox_inventory = exports.ox_inventory
 local ox_target = exports.ox_target
 local qb_target = exports['qb-target']
-local CopCount = 0
+CopCount = 0
 PlayerLoaded = false
 
 local function SendDispatch()

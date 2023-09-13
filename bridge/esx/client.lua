@@ -28,5 +28,7 @@ AddEventHandler('onResourceStart', function(resourceName)
 end)
 
 RegisterNetEvent('ran-storerobbery:client:setCopCount', function(count)
-    CopCount = count
+    if count ~= CopCount then
+        CopCount = count
+    end
 end)
