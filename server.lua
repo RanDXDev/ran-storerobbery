@@ -1,4 +1,3 @@
-local QBCore = exports['qb-core']:GetCoreObject()
 local hookid
 local StringCharset = {}
 local NumberCharset = {}
@@ -41,12 +40,12 @@ local function SendLog(title, content, tageveryone)
     PerformHttpRequest(webhook, function() end, 'POST', json.encode(embedData), { ['Content-Type'] = 'application/json' })
 end
 
-local function RandomStr(length)
+function RandomStr(length)
     if length <= 0 then return '' end
     return RandomStr(length - 1) .. StringCharset[math.random(1, #StringCharset)]
 end
 
-local function RandomInt(length)
+function RandomInt(length)
     if length <= 0 then return '' end
     return RandomInt(length - 1) .. NumberCharset[math.random(1, #NumberCharset)]
 end
@@ -194,7 +193,7 @@ RegisterNetEvent("ran-houserobbery:server:setHackedState", function(storeid, sta
     cfg.hack.hacked = status
     local delayCount = math.random(60, 90)
     cfg.hack.delayCount = delayCount
-    TriggerClientEvent("QBCore:Notify", src, "The alarm will be delayed for " .. math.floor(delayCount) .. " seconds")
+    Functions.NotifyClient(src, "The alarm will be delayed for " .. math.floor(delayCount) .. " seconds")
     TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, cfg)
 end)
 
@@ -204,19 +203,16 @@ lib.callback.register("ran-houserobbery:server:getPrize", function(source, prize
     local regConfig = config.registar[regid]
     if not regConfig then return end
     if regConfig.robbed then return end
-    regConfig.robbed = true
-    local xPlayer = QBCore.Functions.GetPlayer(source)
-    if not xPlayer then return end
-    local itemExist
-    if Config.Inventory == "qb" then
-        itemExist = QBCore.Shared.Items[Config.Prize.item]
-    elseif Config.Inventory == "ox" then
-        itemExist = exports.ox_inventory:Items(Config.Prize.item)
+    if prize > Config.Prize.max then
+        DropPlayer(source, "Exploit")
+        return
     end
+    regConfig.robbed = true
+    local itemExist = Functions.ItemExist(Config.Prize.item)
     if Config.Prize.item and itemExist then
-        xPlayer.Functions.AddItem(Config.Prize.item, prize, nil, nil)
+        Functions.AddItem(source, Config.Prize.item, prize, nil)
     else
-        xPlayer.Functions.AddMoney('cash', prize, 'rob')
+        Functions.AddMoney(source, 'cash', prize)
     end
     SendLog("Get Prize",
         ("%s are robbing a register and got %s %s"):format(GetPlayerName(source), prize,
@@ -236,11 +232,7 @@ lib.callback.register("ran-storerobbery:server:combination", function(source, st
         if scfg.iscomputer then
             scfg.founded = true
         else
-            local xPlayer = QBCore.Functions.GetPlayer(source)
-            if not xPlayer then return end
-            xPlayer.Functions.AddItem('stickynote', 1, nil, {
-                combination = combination
-            })
+            Functions.AddItem(source, 'stickynote', 1, { combination = combination })
         end
     end
     scfg.searched = true
@@ -254,48 +246,7 @@ lib.callback.register("ran-storerobbery:server:setSafeState", function(_, storei
     if not config then return end
     if config.safe.opened and config.safe.id then return end
     config.safe.isopened = true
-    if Config.Inventory == "qb" then
-        local stashid = RandomStr(2) .. RandomInt(2) .. RandomStr(2)
-        local items = {}
-        local itemList = GenerateSafeItems()
-        for _, v in pairs(itemList) do
-            ---@type string
-            local itemname = v[1]
-            ---@type number
-            local itemCount = v[2]
-            local itemInfo = QBCore.Shared.Items[itemname]
-            if itemInfo then
-                items[#items + 1] = {
-                    name = itemInfo.name,
-                    amount = tonumber(itemCount),
-                    info = {},
-                    label = itemInfo.label,
-                    description = itemInfo.description ~= nil and itemInfo.description or "",
-                    weight = itemInfo.weight,
-                    type = itemInfo.type,
-                    unique = itemInfo.unique,
-                    useable = itemInfo.useable,
-                    image = itemInfo.image,
-                    slot = #items + 1
-                }
-            else
-                warn("Can't find iteminfo for " .. itemname)
-            end
-        end
-        MySQL.insert.await(
-            "INSERT INTO stashitems (stash, items) VALUES (:stash, :items) ON DUPLICATE KEY UPDATE items = :items", {
-                ['stash'] = stashid,
-                ['items'] = json.encode(items)
-            })
-        config.safe.id = stashid
-    elseif Config.Inventory == "ox" then
-        config.safe.id = exports.ox_inventory:CreateTemporaryStash({
-            label = "Safe",
-            slots = 10,
-            maxWeight = 30000,
-            items = GenerateSafeItems()
-        })
-    end
+    config.safe.id = Functions.RegisterSafe(storeid, GenerateSafeItems())
     TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, config)
     return true
 end)
@@ -304,11 +255,8 @@ lib.addCommand("reset-store", {
     help = "Reset Store (Store Robbery)"
 }, function(source)
     if source == 0 or not source then return end
-    local xPlayer = QBCore.Functions.GetPlayer(source)
-    if not xPlayer then return end
-    local job = xPlayer.PlayerData.job
-    if not job then return end
-    if job.name ~= "police" then return end
+    local job = Functions.GetJob(source)
+    if not job or job ~= "police" then return end
     local sc = lib.callback.await("ran-storerobbery:client:resetStore", source)
     if sc then
         Cooldown(sc)
@@ -331,15 +279,13 @@ lib.addCommand("get-store-config", {
     end
 end)
 
-QBCore.Functions.CreateUseableItem('stickynote', function(source, item)
+Functions.CreateUseableItem('stickynote', function(src, item)
     if item.info then
-        TriggerClientEvent("QBCore:Notify", source, "Combination: " .. item.info.combination)
+        Functions.NotifyClient(src, "Combination: " .. item.info.combination)
     elseif item.metadata then
-        TriggerClientEvent("QBCore:Notify", source, "Combination: " .. item.metadata.combination)
+        Functions.NotifyClient(src, "Combination: " .. item.metadata.combination)
     end
 end)
-
-
 
 
 AddEventHandler('onResourceStop', function(resource)

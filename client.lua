@@ -1,6 +1,3 @@
-local QBCore = exports['qb-core']:GetCoreObject()
-local PlayerLoaded = false
-local PlayerData = {}
 local CurrentStore
 local InRegZone, RegZoneID = false, nil
 local TempStoreData = {}
@@ -8,6 +5,7 @@ local ox_inventory = exports.ox_inventory
 local ox_target = exports.ox_target
 local qb_target = exports['qb-target']
 local CopCount = 0
+PlayerLoaded = false
 
 local function SendDispatch()
     if GetResourceState("ps-dispatch") == "started" then
@@ -24,10 +22,10 @@ local function Alert(id)
     if cfg?.hack?.delayCount then
         SetTimeout(1000 * cfg.hack.delayCount, function()
             SendDispatch()
-            QBCore.Functions.Notify("The police has been notified", "error")
+            Functions.Notify("The police has been notified", "error")
         end)
     else
-        QBCore.Functions.Notify("The police has been notified", "error")
+        Functions.Notify("The police has been notified", "error")
         SendDispatch()
     end
 end
@@ -94,11 +92,11 @@ end
 local function RobRegistar()
     if not CurrentStore then return end
     if not RegZoneID or not InRegZone then
-        QBCore.Functions.Notify("You need to stand in front of cashier", "error")
+        Functions.Notify("You need to stand in front of cashier", "error")
         return
     end
     if Config.MinPolice > CopCount then
-        QBCore.Functions.Notify("Not enough cops", "error")
+        Functions.Notify("Not enough cops", "error")
         return
     end
     local ped = cache.ped
@@ -106,11 +104,11 @@ local function RobRegistar()
     if not StoreConfig then return end
     local RegConfig = StoreConfig.registar[RegZoneID]
     if RegConfig.robbed then
-        return QBCore.Functions.Notify("There is no money in here", "error")
+        return Functions.Notify("There is no money in here", "error")
     end
     if not RegConfig then return end
     if RegConfig.isusing then
-        return QBCore.Functions.Notify("Somebody is in the register")
+        return Functions.Notify("Somebody is in the register")
     end
     TriggerServerEvent("ran-storerobbery:server:setUse", CurrentStore, RegZoneID, true)
     local anim = "oddjobs@shop_robbery@rob_till"
@@ -119,9 +117,10 @@ local function RobRegistar()
     TaskPlayAnim(ped, anim, animname, 8.0, 8.0, -1, 3, 1.0, false, false, false)
     local prize = math.floor(math.random(Config.Prize.min, Config.Prize.max))
 
-    if lib.progressBar({
+    if lib.progressCircle({
             duration = Config.RegisterSearchTime,
             label = 'Rummaging For Cash',
+            position = 'bottom',
             useWhileDead = false,
             canCancel = true,
             disable = {
@@ -131,14 +130,15 @@ local function RobRegistar()
         }) then
         local success = exports['ran-minigames']:MineSweep(prize, 10, 3, "left")
         if success then
-            local itemName = Config.Inventory == "ox" and ox_inventory:Items(Config.Prize.item).label or
-                QBCore.Shared.Items[Config.Prize.item]?.label
+            local itemLabel = Functions.GetItemLabel(Config.Prize.item)
             lib.callback("ran-houserobbery:server:getPrize", false, function(cb)
-                QBCore.Functions.Notify(
+                Functions.Notify(
                     ("You got %s %s"):format(success,
-                        Config.Prize.item and itemName or "Cash"), "success")
+                        Config.Prize.item and itemLabel or "Cash"), "success")
             end, success, CurrentStore, RegZoneID)
         end
+        TaskPlayAnim(ped, anim, "exit", 8.0, 8.0, -1, 0, 1.0, false, false, false)
+        TriggerServerEvent("ran-storerobbery:server:setUse", CurrentStore, RegZoneID, false)
     else
         TaskPlayAnim(ped, anim, "exit", 8.0, 8.0, -1, 0, 1.0, false, false, false)
         TriggerServerEvent("ran-storerobbery:server:setUse", CurrentStore, RegZoneID, false)
@@ -149,7 +149,7 @@ local EData = nil
 
 local function SearchCombination(storeid, sid)
     if Config.MinPolice > CopCount then
-        QBCore.Functions.Notify("Not enough police", "error")
+        Functions.Notify("Not enough police", "error")
         return
     end
     local config = Config.Store[storeid]
@@ -158,15 +158,15 @@ local function SearchCombination(storeid, sid)
     if not searchLoc then return end
     if config.cooldown then return end
     if config.combination then
-        return QBCore.Functions.Notify("You already got the combination...")
+        return Functions.Notify("You already got the combination...", "error")
     end
     if searchLoc.searched then
-        return QBCore.Functions.Notify("You already search this place...")
+        return Functions.Notify("You already search this place...", "error")
     end
     Alert(storeid)
     if searchLoc.iscomputer then
         if not AllStashSearched(storeid) then
-            return QBCore.Functions.Notify("You need to search all the cabinet first...", "error")
+            return Functions.Notify("You need to search all the cabinet first...", "error")
         end
         local animdict = 'anim@scripted@player@mission@tunf_bunk_ig3_nas_upload@'
         local anim     = 'normal_typing'
@@ -178,40 +178,43 @@ local function SearchCombination(storeid, sid)
             if canGet then
                 local TimeToWait = math.random(20, 30)
                 searchLoc.searched = true
-                QBCore.Functions.Notify("You need to wait " .. TimeToWait .. " seconds, to decrypt the code")
+                Functions.Notify("You need to wait " .. TimeToWait .. " seconds, to decrypt the code")
                 SetTimeout(1000 * TimeToWait, function()
                     lib.callback.await("ran-storerobbery:server:combination", false, storeid, sid, true)
-                    QBCore.Functions.Notify("You got the combination key")
+                    Functions.Notify("You got the combination key")
                 end)
             else
                 lib.callback.await("ran-storerobbery:server:combination", false, storeid, sid, false)
-                QBCore.Functions.Notify("Unable to get any information about pin from this computer", "error")
+                Functions.Notify("Unable to get any information about pin from this computer", "error")
             end
         end
         ClearPedTasks(cache.ped)
     else
-        QBCore.Functions.Progressbar('search-combination', 'Searching for combination', 5000, false, true,
-            { -- Name | Label | Time | useWhileDead | canCancel
-                disableMovement = true,
-                disableCarMovement = true,
-                disableMouse = false,
-                disableCombat = true,
-            }, {
-                animDict = 'mini@repair',
-                anim = 'fixing_a_ped',
-                flags = 16,
-            }, {}, {}, function() -- Play When Done
-                local canGet = math.random(1, 100) > 90 and true or false
-                lib.callback.await("ran-storerobbery:server:combination", false, storeid, sid, canGet)
-                if canGet then
-                    QBCore.Functions.Notify("You got the combination key")
-                else
-                    QBCore.Functions.Notify("You didn't get anything")
-                end
-                ClearPedTasks(cache.ped)
-            end, function() -- Play When Cancel
-                ClearPedTasks(cache.ped)
-            end)
+        if lib.progressCircle({
+                duration = 5000,
+                position = "bottom",
+                useWhileDead = false,
+                label = "Searching combination",
+                canCancel = true,
+                disable = {
+                    car = true
+                },
+                anim = {
+                    dict = "mini@repair",
+                    clip = "fixing_a_ped"
+                }
+            }) then
+            local canGet = math.random(1, 100) > 90 and true or false
+            lib.callback.await("ran-storerobbery:server:combination", false, storeid, sid, canGet)
+            if canGet then
+                Functions.Notify("You got the combination key")
+            else
+                Functions.Notify("You didn't get anything")
+            end
+            ClearPedTasks(cache.ped)
+        else
+            ClearPedTasks(cache.ped)
+        end
     end
 end
 
@@ -257,14 +260,14 @@ local function SetupStore(id)
         })
         if not input then return end
         if not input[1] then
-            return QBCore.Functions.Notify("You need to fill the pin...", "error")
+            return Functions.Notify("You need to fill the pin...", "error")
         end
         local num = tonumber(input[1])
         if num == cfg.combination then
             lib.callback.await("ran-storerobbery:server:setSafeState", false, CurrentStore, true)
-            return QBCore.Functions.Notify("You unlocked the safe", "success")
+            return Functions.Notify("You unlocked the safe", "success")
         else
-            return QBCore.Functions.Notify("Wrong pin number...", "error")
+            return Functions.Notify("Wrong pin number...", "error")
         end
     end
     local function InsideSafe(self)
@@ -306,7 +309,7 @@ local function SetupStore(id)
             options[1].action = function()
                 Hack({ storeid = id })
             end
-            options[1].item = "trojan_usb"
+            options[1].item = Config.HackItem
             local length = cfg.hack.size.x
             local width = cfg.hack.size.y
             TempStoreData.hack = qb_target:AddBoxZone('ran_robbery_hack', cfg.hack.coords, length,
@@ -320,7 +323,7 @@ local function SetupStore(id)
                 })
         elseif Config.Target == "ox" then
             options[1].items = {
-                ['trojan_usb'] = 1
+                [Config.HackItem] = 1
             }
             options[1].onSelect = Hack
             TempStoreData.hack = ox_target:addBoxZone({
@@ -359,19 +362,19 @@ local function SetupStore(id)
                     options[1].action = function()
                         SearchCombination(CurrentStore, k)
                     end
-                    options[1].item = "trojan_usb"
+                    options[1].item = Config.HackItem
                     options[2].action = function()
-                        QBCore.Functions.Notify("The pin is " .. cfg.combination)
+                        Functions.Notify("The pin is " .. cfg.combination)
                     end
                 elseif Config.Target == "ox" then
                     options[1].onSelect = function()
                         SearchCombination(CurrentStore, k)
                     end
                     options[1].items = {
-                        ['trojan_usb'] = 1
+                        [Config.HackItem] = 1
                     }
                     options[2].onSelect = function()
-                        QBCore.Functions.Notify("The pin is " .. cfg.combination)
+                        Functions.Notify("The pin is " .. cfg.combination)
                     end
                 end
             else
@@ -506,11 +509,11 @@ lib.callback.register("ran-storerobbery:client:resetStore", function()
     local cfg = Config.Store[CurrentStore]
     if not cfg then return end
     if cfg.cooldown then
-        QBCore.Functions.Notify("This store is already on cooldown", "error")
+        Functions.Notify("This store is already on cooldown", "error")
         return
     end
     if not cfg.alerted then
-        QBCore.Functions.Notify("This store is not even robbed...", "error")
+        Functions.Notify("This store is not even robbed...", "error")
         return
     end
     local alert = lib.alertDialog({
@@ -526,32 +529,6 @@ lib.callback.register("ran-storerobbery:client:resetStore", function()
     end
 end)
 
----@diagnostic disable-next-line: param-type-mismatch
-AddStateBagChangeHandler('isLoggedIn', nil, function(_bagName, _key, value, _reserved, _replicated)
-    if value then
-        PlayerData = QBCore.Functions.GetPlayerData()
-        if Config.Inventory == "ox" then
-            ox_inventory:displayMetadata({
-                combination = "Combination"
-            })
-        end
-    else
-        table.wipe(PlayerData)
-    end
-    PlayerLoaded = value
-end)
-
-AddEventHandler('onResourceStart', function(resourceName)
-    if GetCurrentResourceName() ~= resourceName or not LocalPlayer.state.isLoggedIn then return end
-    PlayerData = QBCore.Functions.GetPlayerData()
-    PlayerLoaded = true
-end)
-
-RegisterNetEvent('QBCore:Player:SetPlayerData', function(newPlayerData)
-    local invokingResource = GetInvokingResource()
-    if invokingResource and invokingResource ~= 'qb-core' then return end
-    PlayerData = newPlayerData
-end)
 
 RegisterNetEvent("ran-storerobbery:client:setConfigs", function(cfg)
     Config.Store = cfg
@@ -562,10 +539,6 @@ RegisterNetEvent("ran-storerobbery:client:setStoreConfig", function(id, cfg)
     if not type(cfg) == "table" then return end
     if not Config.Store[id] then return end
     Config.Store[id] = cfg
-end)
-
-RegisterNetEvent("police:SetCopCount", function(amount)
-    CopCount = amount
 end)
 
 CreateThread(function()

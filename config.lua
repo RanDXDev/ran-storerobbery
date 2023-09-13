@@ -1,13 +1,15 @@
 Config = Config or {}
 
 
-Config.MinPolice = 0
+Config.MinPolice = 2
 
 Config.Inventory = "ox" -- qb / ox
 
 Config.Target = "ox"    -- qb or ox
 
 Config.RegisterSearchTime = 25000
+
+Config.HackItem = "trojan_usb"
 
 Config.Prize = {
     min = 1000,

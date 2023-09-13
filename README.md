@@ -15,7 +15,7 @@ Dependencies:
 Supported Framework:
 
 - [✅] QBCore
-- [⭕] ESX
+- [✅] ESX
 - [⭕] OX
 
 Supporeted Inventory:
