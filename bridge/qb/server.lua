@@ -1,10 +1,15 @@
 ---@diagnostic disable: duplicate-set-field
 QBCore = exports['qb-core']:GetCoreObject()
 local ox_inventory = exports.ox_inventory
+
 function Functions.AddItem(src, itemname, count, metadata)
     local xPlayer = QBCore.Functions.GetPlayer(src)
     if not xPlayer then return end
     xPlayer.Functions.AddItem(itemname, count, nil, metadata)
+end
+
+function Functions.NotifyClient(src, text)
+    TriggerClientEvent("QBCore:Notify", src, text)
 end
 
 function Functions.RegisterSafe(storeid, items)
