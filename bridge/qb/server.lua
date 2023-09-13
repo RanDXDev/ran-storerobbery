@@ -68,3 +68,9 @@ function Functions.ItemExist(itemname)
         return ox_inventory:Items(itemname)
     end
 end
+
+function Functions.CreateUseableItem(itemname, cb)
+    QBCore.Functions.CreateUseableItem(itemname, function(source, item)
+        cb(source, item)
+    end)
+end
