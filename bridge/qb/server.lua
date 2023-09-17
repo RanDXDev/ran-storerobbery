@@ -18,12 +18,16 @@ function Functions.RegisterSafe(storeid, items)
     if config.safe.opened and config.safe.id then return end
     if Config.Inventory == "qb" then
         local stashid = RandomStr(2) .. RandomInt(2) .. RandomStr(2)
-        for _, v in pairs(items) do
+        for k, v in pairs(items) do
             ---@type string
             local itemname = v[1]
             ---@type number
             local itemCount = v[2]
-            local itemInfo = QBCore.Shared.Items[itemname]
+            local itemInfo = itemname and QBCore.Shared.Items[itemname]
+            if not itemCount then
+                warn("Unable to find itemcount, set the default to 1")
+                itemCount = 1
+            end
             if itemInfo then
                 items[#items + 1] = {
                     name = itemInfo.name,
@@ -39,7 +43,7 @@ function Functions.RegisterSafe(storeid, items)
                     slot = #items + 1
                 }
             else
-                warn("Can't find iteminfo for " .. itemname)
+                warn("Can't find iteminfo")
             end
         end
         MySQL.insert.await(
