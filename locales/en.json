@@ -1,0 +1,23 @@
+{
+  "police_notified": "The police has been notified",
+  "front_cashier": "You need to stand in fron of cashier",
+  "not_enough_cops": "Not enough cops",
+  "no_money": "There is noo money in here",
+  "register_using": "Somebody is in the register",
+  "got_prize": "You got %s %s",
+  "combination_already_found": "You already got the combination...",
+  "combination_found": "You got the combination key",
+  "search_failed": "You didn't get anything",
+  "place_searched": "You already search this place...",
+  "need_all_cabinet": "You need to search all the cabinet first...",
+  "seconds": "seconds",
+  "wait": "You need to wait %s %{seconds} to decrpyt the code",
+  "unable_to_get_pin": "Unable to get any information about pin from this computer",
+  "need_pin": "You need too fill the pin",
+  "safe_unlocked": "You unlocked the safe",
+  "wrong_pin": "Wrong pin number",
+  "pin_info": "The pin is %s",
+  "already_cooldown": "This store is already on cooldown",
+  "not_robbed": "This store is not even robbed...",
+  "alarm_delay": "The alarm will be delayed for %s seconds"
+}
