@@ -84,3 +84,9 @@ function Functions.CreateUseableItem(itemname, cb)
         cb(source, item)
     end)
 end
+
+function Functions.AddMoney(src, type, amount)
+    local xPlayer = QBCore.Functions.GetPlayer(src)
+    if not xPlayer then return end
+    xPlayer.Functions.AddMoney(type, amount)
+end
