@@ -12,13 +12,14 @@ function Functions.NotifyClient(src, text)
     TriggerClientEvent("QBCore:Notify", src, text)
 end
 
-function Functions.RegisterSafe(storeid, items)
+function Functions.RegisterSafe(storeid, itemList)
     local config = Config.Store[storeid]
     if not config then return end
     if config.safe.opened and config.safe.id then return end
     if Config.Inventory == "qb" then
         local stashid = RandomStr(2) .. RandomInt(2) .. RandomStr(2)
-        for k, v in pairs(items) do
+        local items = {}
+        for _, v in pairs(itemList) do
             ---@type string
             local itemname = v[1]
             ---@type number
@@ -57,7 +58,7 @@ function Functions.RegisterSafe(storeid, items)
             label = "Safe",
             slots = 10,
             maxWeight = 100000,
-            items = items
+            items = itemList
         })
     end
 end
