@@ -5,7 +5,10 @@ local ox_inventory = exports.ox_inventory
 local ox_target = exports.ox_target
 local qb_target = exports['qb-target']
 CopCount = 0
+lib.locale()
+
 PlayerLoaded = false
+
 
 local function SendDispatch()
     if GetResourceState("ps-dispatch") == "started" then
@@ -22,10 +25,10 @@ local function Alert(id)
     if cfg?.hack?.delayCount then
         SetTimeout(1000 * cfg.hack.delayCount, function()
             SendDispatch()
-            Functions.Notify("The police has been notified", "error")
+            Functions.Notify(locale("police_notified"), "error")
         end)
     else
-        Functions.Notify("The police has been notified", "error")
+        Functions.Notify(locale("police_notified"), "error")
         SendDispatch()
     end
 end
@@ -92,11 +95,11 @@ end
 local function RobRegistar()
     if not CurrentStore then return end
     if not RegZoneID or not InRegZone then
-        Functions.Notify("You need to stand in front of cashier", "error")
+        Functions.Notify(locale("front_cashier"), "error")
         return
     end
     if Config.MinPolice > CopCount then
-        Functions.Notify("Not enough cops", "error")
+        Functions.Notify(locale("not_enough_cops"), "error")
         return
     end
     local ped = cache.ped
@@ -104,11 +107,11 @@ local function RobRegistar()
     if not StoreConfig then return end
     local RegConfig = StoreConfig.registar[RegZoneID]
     if RegConfig.robbed then
-        return Functions.Notify("There is no money in here", "error")
+        return Functions.Notify(locale("no_money"), "error")
     end
     if not RegConfig then return end
     if RegConfig.isusing then
-        return Functions.Notify("Somebody is in the register")
+        return Functions.Notify(locale("register_using"))
     end
     TriggerServerEvent("ran-storerobbery:server:setUse", CurrentStore, RegZoneID, true)
     local anim = "oddjobs@shop_robbery@rob_till"
@@ -128,14 +131,12 @@ local function RobRegistar()
                 move = true,
             },
         }) then
-        local success = exports['ran-minigames']:MineSweep(prize, 10, 3, "left")
-        if success then
+        local moneyAmount = exports['ran-minigames']:MineSweep(prize, 10, 3, "left")
+        if moneyAmount then
             local itemLabel = Functions.GetItemLabel(Config.Prize.item)
             lib.callback("ran-houserobbery:server:getPrize", false, function(cb)
-                Functions.Notify(
-                    ("You got %s %s"):format(success,
-                        Config.Prize.item and itemLabel or "Cash"), "success")
-            end, success, CurrentStore, RegZoneID)
+                Functions.Notify(locale("got_prize", moneyAmount, Config.Prize.item and itemLabel or "Cash"), "success")
+            end, moneyAmount, CurrentStore, RegZoneID)
         end
         TaskPlayAnim(ped, anim, "exit", 8.0, 8.0, -1, 0, 1.0, false, false, false)
         TriggerServerEvent("ran-storerobbery:server:setUse", CurrentStore, RegZoneID, false)
@@ -149,7 +150,7 @@ local EData = nil
 
 local function SearchCombination(storeid, sid)
     if Config.MinPolice > CopCount then
-        Functions.Notify("Not enough police", "error")
+        Functions.Notify(locale("not_enough_cops"), "error")
         return
     end
     local config = Config.Store[storeid]
@@ -158,15 +159,15 @@ local function SearchCombination(storeid, sid)
     if not searchLoc then return end
     if config.cooldown then return end
     if config.combination then
-        return Functions.Notify("You already got the combination...", "error")
+        return Functions.Notify(locale("combination_already_found"), "error")
     end
     if searchLoc.searched then
-        return Functions.Notify("You already search this place...", "error")
+        return Functions.Notify(locale("place_searched"), "error")
     end
     Alert(storeid)
     if searchLoc.iscomputer then
         if not AllStashSearched(storeid) then
-            return Functions.Notify("You need to search all the cabinet first...", "error")
+            return Functions.Notify(locale("need_all_cabinet"), "error")
         end
         local animdict = 'anim@scripted@player@mission@tunf_bunk_ig3_nas_upload@'
         local anim     = 'normal_typing'
@@ -178,14 +179,14 @@ local function SearchCombination(storeid, sid)
             if canGet then
                 local TimeToWait = math.random(20, 30)
                 searchLoc.searched = true
-                Functions.Notify("You need to wait " .. TimeToWait .. " seconds, to decrypt the code")
+                Functions.Notify(locale("wait", TimeToWait))
                 SetTimeout(1000 * TimeToWait, function()
                     lib.callback.await("ran-storerobbery:server:combination", false, storeid, sid, true)
-                    Functions.Notify("You got the combination key")
+                    Functions.Notify(locale("combination_found"))
                 end)
             else
                 lib.callback.await("ran-storerobbery:server:combination", false, storeid, sid, false)
-                Functions.Notify("Unable to get any information about pin from this computer", "error")
+                Functions.Notify(locale("unable_to_get_pin"), "error")
             end
         end
         ClearPedTasks(cache.ped)
@@ -207,9 +208,9 @@ local function SearchCombination(storeid, sid)
             local canGet = math.random(1, 100) > 90 and true or false
             lib.callback.await("ran-storerobbery:server:combination", false, storeid, sid, canGet)
             if canGet then
-                Functions.Notify("You got the combination key")
+                Functions.Notify(locale("combination_found"))
             else
-                Functions.Notify("You didn't get anything")
+                Functions.Notify(locale("search_failed"))
             end
             ClearPedTasks(cache.ped)
         else
@@ -260,14 +261,14 @@ local function SetupStore(id)
         })
         if not input then return end
         if not input[1] then
-            return Functions.Notify("You need to fill the pin...", "error")
+            return Functions.Notify(locale("need_pin"), "error")
         end
         local num = tonumber(input[1])
         if num == cfg.combination then
             lib.callback.await("ran-storerobbery:server:setSafeState", false, CurrentStore, true)
-            return Functions.Notify("You unlocked the safe", "success")
+            return Functions.Notify(locale("safe_unlocked"), "success")
         else
-            return Functions.Notify("Wrong pin number...", "error")
+            return Functions.Notify(locale("wrong_pin"), "error")
         end
     end
     local function InsideSafe(self)
@@ -362,7 +363,7 @@ local function SetupStore(id)
                     end
                     options[1].item = Config.HackItem
                     options[2].action = function()
-                        Functions.Notify("The pin is " .. cfg.combination)
+                        Functions.Notify(locale("pin_info", cfg.combination))
                     end
                 elseif Config.Target == "ox" then
                     options[1].onSelect = function()
@@ -372,7 +373,7 @@ local function SetupStore(id)
                         [Config.HackItem] = 1
                     }
                     options[2].onSelect = function()
-                        Functions.Notify("The pin is " .. cfg.combination)
+                        Functions.Notify(locale("pin_info", cfg.combination))
                     end
                 end
             else
@@ -507,11 +508,11 @@ lib.callback.register("ran-storerobbery:client:resetStore", function()
     local cfg = Config.Store[CurrentStore]
     if not cfg then return end
     if cfg.cooldown then
-        Functions.Notify("This store is already on cooldown", "error")
+        Functions.Notify(locale("already_cooldown"), "error")
         return
     end
     if not cfg.alerted then
-        Functions.Notify("This store is not even robbed...", "error")
+        Functions.Notify(locale("not_robbed"), "error")
         return
     end
     local alert = lib.alertDialog({

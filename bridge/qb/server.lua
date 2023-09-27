@@ -12,18 +12,23 @@ function Functions.NotifyClient(src, text)
     TriggerClientEvent("QBCore:Notify", src, text)
 end
 
-function Functions.RegisterSafe(storeid, items)
+function Functions.RegisterSafe(storeid, itemList)
     local config = Config.Store[storeid]
     if not config then return end
     if config.safe.opened and config.safe.id then return end
     if Config.Inventory == "qb" then
         local stashid = RandomStr(2) .. RandomInt(2) .. RandomStr(2)
-        for _, v in pairs(items) do
+        local items = {}
+        for _, v in pairs(itemList) do
             ---@type string
             local itemname = v[1]
             ---@type number
             local itemCount = v[2]
-            local itemInfo = QBCore.Shared.Items[itemname]
+            local itemInfo = itemname and QBCore.Shared.Items[itemname]
+            if not itemCount then
+                warn("Unable to find itemcount, set the default to 1")
+                itemCount = 1
+            end
             if itemInfo then
                 items[#items + 1] = {
                     name = itemInfo.name,
@@ -39,7 +44,7 @@ function Functions.RegisterSafe(storeid, items)
                     slot = #items + 1
                 }
             else
-                warn("Can't find iteminfo for " .. itemname)
+                warn("Can't find iteminfo")
             end
         end
         MySQL.insert.await(
@@ -53,7 +58,7 @@ function Functions.RegisterSafe(storeid, items)
             label = "Safe",
             slots = 10,
             maxWeight = 100000,
-            items = items
+            items = itemList
         })
     end
 end
@@ -78,4 +83,10 @@ function Functions.CreateUseableItem(itemname, cb)
     QBCore.Functions.CreateUseableItem(itemname, function(source, item)
         cb(source, item)
     end)
+end
+
+function Functions.AddMoney(src, type, amount)
+    local xPlayer = QBCore.Functions.GetPlayer(src)
+    if not xPlayer then return end
+    xPlayer.Functions.AddMoney(type, amount)
 end

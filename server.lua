@@ -1,3 +1,4 @@
+lib.locale()
 local hookid
 local StringCharset = {}
 local NumberCharset = {}
@@ -99,13 +100,17 @@ local function GenerateSafeItems()
     local selectedItems = {}
 
     for item, properties in pairs(Config.Prize.safe) do
-        currentChance = currentChance + properties.chance
-        if randomNumber <= currentChance then
-            local itemCount = math.random(properties.min, properties.max)
-            selectedItems[#selectedItems + 1] = {
-                [1] = item,
-                [2] = itemCount
-            }
+        if Functions.ItemExist(item) then
+            currentChance = currentChance + properties.chance
+            if randomNumber <= currentChance then
+                local itemCount = math.random(properties.min, properties.max)
+                selectedItems[#selectedItems + 1] = {
+                    [1] = item,
+                    [2] = itemCount
+                }
+            end
+        else
+            warn(("Item %s doesn't exist"):format(item or "unknown"))
         end
     end
     return selectedItems
@@ -193,7 +198,7 @@ RegisterNetEvent("ran-houserobbery:server:setHackedState", function(storeid, sta
     cfg.hack.hacked = status
     local delayCount = math.random(60, 90)
     cfg.hack.delayCount = delayCount
-    Functions.NotifyClient(src, "The alarm will be delayed for " .. math.floor(delayCount) .. " seconds")
+    Functions.NotifyClient(src, locale("alarm_delay", math.floor(delayCount)))
     TriggerClientEvent("ran-storerobbery:client:setStoreConfig", -1, storeid, cfg)
 end)
 
@@ -281,9 +286,9 @@ end)
 
 Functions.CreateUseableItem('stickynote', function(src, item)
     if item.info then
-        Functions.NotifyClient(src, "Combination: " .. item.info.combination)
+        Functions.NotifyClient(src, locale("pin_info", item.info.combination))
     elseif item.metadata then
-        Functions.NotifyClient(src, "Combination: " .. item.metadata.combination)
+        Functions.NotifyClient(src, locale("pin_info", item.metadata.combination))
     end
 end)
 
